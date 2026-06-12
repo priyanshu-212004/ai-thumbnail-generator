@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThumbAI — AI Thumbnail Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── TOKEN SYSTEM ──────────────────────────────────────────── */
+    :root {
+      --violet:     #7C3AED;
+      --violet-lt:  #9D5FF5;
+      --cyan:       #00D4FF;
+      --cyan-dim:   #00A8CC;
+
+      /* dark theme defaults */
+      --bg:         #0A0E1A;
+      --bg-surface: #111827;
+      --bg-card:    #161D2E;
+      --border:     rgba(124,58,237,0.25);
+      --text:       #F0F4FF;
+      --text-muted: #7E8BA8;
+      --text-faint: #3D4A6B;
+      --glow:       rgba(124,58,237,0.35);
+      --glow-cyan:  rgba(0,212,255,0.25);
+      --shadow:     0 24px 60px rgba(0,0,0,0.6);
+    }
+
+    [data-theme="light"] {
+      --bg:         #F4F6FF;
+      --bg-surface: #FFFFFF;
+      --bg-card:    #ECEFFE;
+      --border:     rgba(124,58,237,0.2);
+      --text:       #0D1226;
+      --text-muted: #5A6481;
+      --text-faint: #BCC2D8;
+      --glow:       rgba(124,58,237,0.15);
+      --glow-cyan:  rgba(0,180,220,0.15);
+      --shadow:     0 24px 60px rgba(124,58,237,0.12);
+    }
+
+    /* ── RESET ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      transition: background 0.4s ease, color 0.3s ease;
+      overflow-x: hidden;
+    }
+
+    /* ── CANVAS PARTICLES ───────────────────────────────────────── */
+    #particle-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── NAV ────────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 5%;
+      height: 68px;
+      background: rgba(10,14,26,0.72);
+      backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.4s;
+    }
+    [data-theme="light"] nav { background: rgba(244,246,255,0.82); }
+
+    .logo {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.45rem;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .logo span { color: var(--cyan); }
+
+    .nav-right { display: flex; align-items: center; gap: 1.5rem; }
+
+    .nav-link {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-link:hover { color: var(--text); }
+
+    .btn-nav {
+      background: var(--violet);
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-nav:hover { background: var(--violet-lt); transform: translateY(-1px); }
+
+    /* ── THEME TOGGLE ──────────────────────────────────────────── */
+    .theme-toggle {
+      width: 44px; height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-card);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.3s, border 0.3s, transform 0.15s;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover { transform: scale(1.05); border-color: var(--violet); }
+    .theme-toggle svg { width: 20px; height: 20px; fill: none; stroke: var(--text-muted); stroke-width: 1.8; transition: stroke 0.3s; }
+    .theme-toggle:hover svg { stroke: var(--violet); }
+
+    /* ── HERO ───────────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 5% 60px;
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.25);
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      margin-bottom: 1.8rem;
+    }
+    .eyebrow-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--cyan);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:0.4; transform:scale(0.7); }
+    }
+
+    .hero-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(2.6rem, 6vw, 5.2rem);
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      max-width: 780px;
+      margin-bottom: 1.4rem;
+    }
+    .hero-title .grad {
+      background: linear-gradient(135deg, var(--violet-lt) 0%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 1.1rem;
+      line-height: 1.7;
+      color: var(--text-muted);
+      max-width: 520px;
+      margin-bottom: 3rem;
+    }
+
+    /* ── UPLOAD ZONE ───────────────────────────────────────────── */
+    .upload-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .upload-zone {
+      position: relative;
+      border: 2px dashed var(--border);
+      border-radius: 20px;
+      padding: 3rem 2rem;
+      cursor: pointer;
+      background: var(--bg-card);
+      transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+      overflow: hidden;
+    }
+    .upload-zone::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, var(--violet), var(--cyan));
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: -1;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: transparent;
+      box-shadow: 0 0 0 2px var(--violet), 0 20px 60px var(--glow);
+      transform: translateY(-2px);
+    }
+    .upload-zone:hover::before, .upload-zone.drag-over::before { opacity: 1; }
+
+    .upload-icon-wrap {
+      width: 72px; height: 72px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(0,212,255,0.15));
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.2rem;
+      transition: transform 0.3s;
+    }
+    .upload-zone:hover .upload-icon-wrap { transform: scale(1.1) rotate(-4deg); }
+    .upload-icon-wrap svg { width: 32px; height: 32px; stroke: var(--violet-lt); fill: none; stroke-width: 1.6; }
+
+    .upload-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+    .upload-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.4rem;
+    }
+
+    .btn-upload {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, var(--violet), #5B21B6);
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.8rem;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s, box-shadow 0.3s;
+      box-shadow: 0 8px 30px rgba(124,58,237,0.4);
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-upload:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 12px 40px rgba(124,58,237,0.55); }
+
+    .upload-formats {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--text-faint);
+    }
+
+    #file-input { display: none; }
+
+    /* ── PROCESSING STATE ──────────────────────────────────────── */
+    .processing-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: var(--bg-card);
+      border-radius: 18px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .processing-overlay.active { display: flex; }
+
+    .spinner-ring {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      border: 3px solid var(--border);
+      border-top-color: var(--violet);
+      border-right-color: var(--cyan);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .processing-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .processing-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: -0.5rem;
+    }
+
+    /* ── PREVIEW RESULT ────────────────────────────────────────── */
+    .result-section {
+      display: none;
+      width: 100%;
+      max-width: 640px;
+      margin: 2rem auto 0;
+    }
+    .result-section.active { display: block; }
+
+    .compare-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+    .compare-card {
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+    .compare-label {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .compare-img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      display: block;
+      filter: none;
+    }
+    .compare-card.original .compare-img { filter: saturate(0.5) contrast(0.9); }
+
+    .result-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, var(--cyan-dim), var(--cyan));
+      color: #0A0E1A;
+      border: none;
+      padding: 0.7rem 1.6rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-download:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-retry {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.7rem 1.4rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-retry:hover { border-color: var(--violet); color: var(--text); }
+
+    /* ── TRUST STRIP ───────────────────────────────────────────── */
+    .trust-strip {
+      position: relative; z-index: 1;
+      padding: 1.5rem 5%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .trust-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .trust-item svg { width: 18px; height: 18px; stroke: var(--cyan); fill: none; stroke-width: 2; }
+
+    /* ── HOW IT WORKS ──────────────────────────────────────────── */
+    .section {
+      position: relative; z-index: 1;
+      padding: 100px 5%;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--violet-lt);
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+      line-height: 1.15;
+    }
+    .section-desc {
+      font-size: 1rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 480px;
+      margin-bottom: 3.5rem;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    .step-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 2rem 1.6rem;
+      transition: border-color 0.3s, box-shadow 0.3s, transform 0.25s;
+    }
+    .step-card:hover {
+      border-color: var(--violet);
+      box-shadow: 0 12px 40px var(--glow);
+      transform: translateY(-4px);
+    }
+
+    .step-num {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--cyan);
+      margin-bottom: 1rem;
+    }
+    .step-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(0,212,255,0.1));
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.2rem;
+    }
+    .step-icon svg { width: 24px; height: 24px; stroke: var(--violet-lt); fill: none; stroke-width: 1.8; }
+    .step-h { font-family: 'Space Grotesk', sans-serif; font-size: 1.05rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .step-p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.65; }
+
+    /* ── FEATURES ──────────────────────────────────────────────── */
+    .features-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+    .feature-list { display: flex; flex-direction: column; gap: 1.25rem; }
+    .feature-item {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 1.25rem 1.5rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .feature-item:hover { border-color: var(--violet); box-shadow: 0 8px 30px var(--glow); }
+    .feat-icon {
+      width: 40px; height: 40px; flex-shrink: 0;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(0,212,255,0.12));
+      display: flex; align-items: center; justify-content: center;
+    }
+    .feat-icon svg { width: 20px; height: 20px; stroke: var(--cyan); fill: none; stroke-width: 2; }
+    .feat-h { font-family: 'Space Grotesk', sans-serif; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .feat-p { font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; }
+
+    .features-visual {
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+    .fv-header {
+      display: flex; align-items: center; gap: 0.5rem;
+      margin-bottom: 1.2rem;
+    }
+    .fv-dot { width:10px;height:10px;border-radius:50%; }
+    .fv-dot:nth-child(1){background:#FF5F56;}
+    .fv-dot:nth-child(2){background:#FFBD2E;}
+    .fv-dot:nth-child(3){background:#27C93F;}
+    .fv-title { font-size: 0.78rem; color: var(--text-faint); margin-left: auto; }
+    .fv-img-mock {
+      width: 100%; border-radius: 12px;
+      background: linear-gradient(135deg, #1a0533, #0d2040);
+      aspect-ratio: 16/9;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .fv-img-mock::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 40%, rgba(124,58,237,0.4) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 60%, rgba(0,212,255,0.25) 0%, transparent 50%);
+    }
+    .fv-mock-text {
+      position: relative;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .fv-mock-badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: var(--cyan);
+      color: #0A0E1A;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .fv-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .fv-stat {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .fv-stat-val {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--violet-lt), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .fv-stat-lbl { font-size: 0.68rem; color: var(--text-faint); margin-top: 2px; }
+
+    /* ── CTA ────────────────────────────────────────────────────── */
+    .cta-section {
+      position: relative; z-index: 1;
+      margin: 0 5% 100px;
+      border-radius: 28px;
+      padding: 5rem 4rem;
+      background: linear-gradient(135deg, rgba(124,58,237,0.18) 0%, rgba(0,212,255,0.1) 100%);
+      border: 1px solid var(--border);
+      text-align: center;
+      overflow: hidden;
+    }
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,58,237,0.25), transparent 70%);
+      pointer-events: none;
+    }
+    .cta-section::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; left: -60px;
+      width: 250px; height: 250px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,255,0.15), transparent 70%);
+      pointer-events: none;
+    }
+    .cta-h {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.9rem;
+    }
+    .cta-p { font-size: 1rem; color: var(--text-muted); margin-bottom: 2.5rem; }
+    .btn-cta-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: linear-gradient(135deg, var(--violet), #5B21B6);
+      color: #fff;
+      border: none;
+      padding: 1rem 2.4rem;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 12px 40px rgba(124,58,237,0.45);
+      transition: opacity 0.2s, transform 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-cta-primary:hover { opacity: 0.9; transform: translateY(-2px); }
+
+    /* ── FOOTER ─────────────────────────────────────────────────── */
+    footer {
+      position: relative; z-index: 1;
+      padding: 2.5rem 5%;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .footer-logo { font-family: 'Space Grotesk',sans-serif; font-weight:700; font-size:1.1rem; color:var(--text-muted); }
+    .footer-logo span { color: var(--cyan); }
+    .footer-copy { font-size:0.8rem; color:var(--text-faint); }
+    .footer-links { display:flex; gap:1.5rem; }
+    .footer-links a { font-size:0.8rem; color:var(--text-faint); text-decoration:none; transition:color 0.2s; }
+    .footer-links a:hover { color:var(--text-muted); }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .steps-grid { grid-template-columns: 1fr; }
+      .features-wrap { grid-template-columns: 1fr; }
+      .compare-bar { grid-template-columns: 1fr; }
+      .nav-link { display: none; }
+      .cta-section { padding: 3rem 2rem; }
+      .section { padding: 70px 5%; }
+    }
+
+    /* ── SCROLL FADE IN ─────────────────────────────────────────── */
+    .fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="#">Thumb<span>AI</span></a>
+  <div class="nav-right">
+    <a class="nav-link" href="#how">How it works</a>
+    <a class="nav-link" href="#features">Features</a>
+    <button class="btn-nav" onclick="scrollToUpload()">Try Free</button>
+    <button class="theme-toggle" id="theme-btn" title="Toggle theme" aria-label="Toggle light/dark theme">
+      <!-- moon icon (dark mode) -->
+      <svg id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
+      <!-- sun icon (light mode) -->
+      <svg id="icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="upload">
+  <div class="hero-eyebrow">
+    <span class="eyebrow-dot"></span>
+    AI-Powered · Instant · Free to Try
+  </div>
+  <h1 class="hero-title">Turn any image into a <span class="grad">stunning thumbnail</span> in seconds</h1>
+  <p class="hero-sub">Drop your raw photo, let ThumbAI do the magic — bold contrast, perfect crop, scroll-stopping results. No design skills needed.</p>
+
+  <div class="upload-wrapper" id="upload-area">
+    <div class="upload-zone" id="drop-zone">
+      <div class="upload-icon-wrap">
+        <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      </div>
+      <div class="upload-title">Drop your image here</div>
+      <div class="upload-sub">or click to browse from your device</div>
+      <button class="btn-upload" id="pick-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Choose Image
+      </button>
+      <div class="upload-formats">Supports JPG, PNG, WEBP · Max 20MB</div>
+      <input type="file" id="file-input" accept="image/*" />
+
+      <div class="processing-overlay" id="processing">
+        <div class="spinner-ring"></div>
+        <div class="processing-text">Generating your thumbnail…</div>
+        <div class="processing-sub">AI is analysing composition & contrast</div>
+      </div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="result-section" id="result-section">
+      <div class="compare-bar">
+        <div class="compare-card original">
+          <div class="compare-label">Original</div>
+          <img class="compare-img" id="orig-img" src="" alt="Original" />
+        </div>
+        <div class="compare-card">
+          <div class="compare-label">✦ AI Thumbnail</div>
+          <img class="compare-img" id="thumb-img" src="" alt="AI Thumbnail" />
+        </div>
+      </div>
+      <div class="result-actions">
+        <button class="btn-download" id="dl-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Thumbnail
+        </button>
+        <button class="btn-retry" id="retry-btn">Try another</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<div class="trust-strip fade-in">
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    No signup required
+  </div>
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Instant — under 3 seconds
+  </div>
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    Your images stay private
+  </div>
+  <div class="trust-item">
+    <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    4.9 / 5 from 12k creators
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="section fade-in" id="how">
+  <div class="section-label">Process</div>
+  <h2 class="section-title">Three steps to a perfect thumbnail</h2>
+  <p class="section-desc">No Photoshop. No design degree. Just your photo and a click.</p>
+
+  <div class="steps-grid">
+    <div class="step-card fade-in">
+      <div class="step-num">STEP 01</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      </div>
+      <div class="step-h">Upload your raw image</div>
+      <p class="step-p">Drag and drop or browse — any photo works. Blurry, dark, cluttered, or plain. Our model handles it all.</p>
+    </div>
+    <div class="step-card fade-in">
+      <div class="step-num">STEP 02</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div class="step-h">AI enhances &amp; crops</div>
+      <p class="step-p">Our vision model detects the subject, boosts contrast, tightens the crop, and applies platform-aware sizing in under 3 seconds.</p>
+    </div>
+    <div class="step-card fade-in">
+      <div class="step-num">STEP 03</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div class="step-h">Download &amp; publish</div>
+      <p class="step-p">One click downloads your thumbnail at the ideal resolution for YouTube, Twitter, LinkedIn, or any platform you choose.</p>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="section fade-in" id="features" style="padding-top:0;">
+  <div class="features-wrap">
+    <div>
+      <div class="section-label">Why ThumbAI</div>
+      <h2 class="section-title">Built for creators who ship fast</h2>
+      <p class="section-desc">Every decision ThumbAI makes is trained on millions of high-click thumbnails across every niche.</p>
+      <div class="feature-list">
+        <div class="feature-item">
+          <div class="feat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/></svg></div>
+          <div class="feat-body">
+            <div class="feat-h">Smart Subject Detection</div>
+            <p class="feat-p">Identifies faces, objects, and focal points and brings them front and center every time.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10"/><path d="M12 8v4l3 3"/></svg></div>
+          <div class="feat-body">
+            <div class="feat-h">Platform-Optimised Output</div>
+            <p class="feat-p">YouTube 16:9, Twitter 2:1, LinkedIn 1.91:1 — exported at exactly the right size and quality.</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M14.5 10.5 l2-2 M10 14l4.5-4.5"/><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/></svg></div>
+          <div class="feat-body">
+            <div class="feat-h">Colour &amp; Contrast Boost</div>
+            <p class="feat-p">Cinematic tone-mapping lifts flat images into scroll-stopping visuals without over-processing.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="features-visual">
+      <div class="fv-header">
+        <span class="fv-dot"></span><span class="fv-dot"></span><span class="fv-dot"></span>
+        <span class="fv-title">thumbnail_preview.jpg</span>
+      </div>
+      <div class="fv-img-mock">
+        <div class="fv-mock-badge">AI Generated</div>
+        <div class="fv-mock-text">Your Best<br/>Thumbnail<br/>Ever ✦</div>
+      </div>
+      <div class="fv-stats">
+        <div class="fv-stat"><div class="fv-stat-val">3s</div><div class="fv-stat-lbl">Avg. time</div></div>
+        <div class="fv-stat"><div class="fv-stat-val">4K</div><div class="fv-stat-lbl">Max output</div></div>
+        <div class="fv-stat"><div class="fv-stat-val">∞</div><div class="fv-stat-lbl">Formats</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-section fade-in">
+  <h2 class="cta-h">Your next viral thumbnail is one upload away</h2>
+  <p class="cta-p">Join 50,000+ creators who already use ThumbAI every week.</p>
+  <button class="btn-cta-primary" onclick="scrollToUpload()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    Generate My Thumbnail Free
+  </button>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Thumb<span>AI</span></div>
+  <div class="footer-copy">© 2025 ThumbAI. All rights reserved.</div>
+  <div class="footer-links">
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+    <a href="#">Contact</a>
+  </div>
+</footer>
+
+<script>
+  /* ── PARTICLES ───────────────────────────────────────────────── */
+  const canvas = document.getElementById('particle-canvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function makeParticle() {
+    return {
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.4 + 0.4,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      alpha: Math.random() * 0.5 + 0.1,
+      color: Math.random() > 0.5 ? '#7C3AED' : '#00D4FF'
+    };
+  }
+  for (let i = 0; i < 80; i++) particles.push(makeParticle());
+
+  function animParticles() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animParticles);
+  }
+  animParticles();
+
+  /* ── THEME TOGGLE ────────────────────────────────────────────── */
+  const html = document.documentElement;
+  const moonIcon = document.getElementById('icon-moon');
+  const sunIcon = document.getElementById('icon-sun');
+  document.getElementById('theme-btn').addEventListener('click', () => {
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    moonIcon.style.display = isDark ? 'none' : '';
+    sunIcon.style.display = isDark ? '' : 'none';
+  });
+
+  /* ── UPLOAD & FAKE PROCESSING ────────────────────────────────── */
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const processing = document.getElementById('processing');
+  const resultSection = document.getElementById('result-section');
+  const origImg = document.getElementById('orig-img');
+  const thumbImg = document.getElementById('thumb-img');
+
+  document.getElementById('pick-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(file) {
+    if (!file.type.startsWith('image/')) { alert('Please upload an image file.'); return; }
+    const url = URL.createObjectURL(file);
+    origImg.src = url;
+    resultSection.classList.remove('active');
+    processing.classList.add('active');
+
+    // Simulate AI processing with canvas filter
+    setTimeout(() => {
+      processing.classList.remove('active');
+      applyThumbnailEffect(url);
+    }, 2400);
+  }
+
+  function applyThumbnailEffect(url) {
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas');
+      const targetW = 1280, targetH = 720;
+      cv.width = targetW; cv.height = targetH;
+      const c = cv.getContext('2d');
+
+      // Smart crop: centre crop to 16:9
+      const srcRatio = img.width / img.height;
+      const tgtRatio = targetW / targetH;
+      let sw, sh, sx, sy;
+      if (srcRatio > tgtRatio) {
+        sh = img.height; sw = sh * tgtRatio;
+        sx = (img.width - sw) / 2; sy = 0;
+      } else {
+        sw = img.width; sh = sw / tgtRatio;
+        sx = 0; sy = (img.height - sh) / 2;
+      }
+      c.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+
+      // Boost contrast + saturation via pixel manipulation
+      const id = c.getImageData(0, 0, targetW, targetH);
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        // contrast
+        d[i]   = Math.min(255, ((d[i]   / 255 - 0.5) * 1.3 + 0.5) * 255);
+        d[i+1] = Math.min(255, ((d[i+1] / 255 - 0.5) * 1.3 + 0.5) * 255);
+        d[i+2] = Math.min(255, ((d[i+2] / 255 - 0.5) * 1.3 + 0.5) * 255);
+        // slight warmth / saturation boost
+        d[i]   = Math.min(255, d[i]   * 1.05);
+        d[i+2] = Math.max(0,   d[i+2] * 0.95);
+      }
+      c.putImageData(id, 0, 0);
+
+      // Vignette overlay
+      const grad = c.createRadialGradient(targetW/2, targetH/2, targetH*0.3, targetW/2, targetH/2, targetH*0.8);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.38)');
+      c.fillStyle = grad;
+      c.fillRect(0, 0, targetW, targetH);
+
+      thumbImg.src = cv.toDataURL('image/jpeg', 0.92);
+      resultSection.classList.add('active');
+
+      // download
+      document.getElementById('dl-btn').onclick = () => {
+        const a = document.createElement('a');
+        a.href = cv.toDataURL('image/jpeg', 0.92);
+        a.download = 'thumbai-thumbnail.jpg';
+        a.click();
+      };
+    };
+    img.src = url;
+  }
+
+  document.getElementById('retry-btn').addEventListener('click', () => {
+    resultSection.classList.remove('active');
+    origImg.src = ''; thumbImg.src = '';
+    fileInput.value = '';
+  });
+
+  /* ── SCROLL TO UPLOAD ─────────────────────────────────────────── */
+  function scrollToUpload() {
+    document.getElementById('upload').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  /* ── INTERSECTION OBSERVER ───────────────────────────────────── */
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
